@@ -25,7 +25,7 @@ export class MonitoringUtils {
             const alerts: PerformanceAlert[] = [];
 
             if (stats.metrics) {
-                // Vérifier le temps de réponse
+                // Check response time
                 if (stats.metrics.avgResponseTime > opts.maxResponseTime) {
                     alerts.push({
                         type: 'HIGH_RESPONSE_TIME',
@@ -35,7 +35,7 @@ export class MonitoringUtils {
                     });
                 }
 
-                // Vérifier le taux de succès
+                // Check success rate
                 const successRate = stats.metrics.totalRequests > 0
                     ? stats.metrics.successfulRequests / stats.metrics.totalRequests
                     : 1;
@@ -49,7 +49,7 @@ export class MonitoringUtils {
                     });
                 }
 
-                // Vérifier les rate limits
+                // Check rate limits
                 if (stats.metrics.rateLimitHits > 0) {
                     alerts.push({
                         type: 'RATE_LIMIT_HIT',
@@ -60,14 +60,14 @@ export class MonitoringUtils {
                 }
             }
 
-            // Envoyer les alertes
+            // Send alerts
             alerts.forEach(alert => opts.alertCallback!(alert));
 
-        }, 30000); // Vérifier toutes les 30 secondes
+        }, 30000); // Check every 30 seconds
     }
 
     /**
-     * Génère un rapport de santé du client
+     * Generate a health report for the client
      */
     static generateHealthReport(client: CodaClient): HealthReport {
         const stats = client.getStats();

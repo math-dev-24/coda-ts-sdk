@@ -1,4 +1,4 @@
-export * from './types/index.type';
+export * from './types';
 export * from './helpers';
 // Client
 export { CodaClient } from './client/codaClient';
