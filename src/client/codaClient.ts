@@ -17,10 +17,24 @@ import {
     CodaRowListParams,
     CodaRowRequest,
     CodaListParams
-} from '../types';
+} from '../types/coda.type';
+import {CodaRateLimitError} from "../types/errors.type";
+import {Logger, LogLevel} from "../utils/logger";
+import {RateLimiter} from "./rateLimiter";
+import {ApiCache} from "./cache";
+import {MetricsCollector} from "./metrics";
+import {RequestMetrics} from "../types/metrics.type";
 
-// Charge automatiquement les variables d'environnement
+// Load environment variables
 config();
+
+export interface EnhancedCodaClientConfig extends CodaClientConfig {
+    enableCache?: boolean;
+    enableRateLimit?: boolean;
+    enableMetrics?: boolean;
+    logLevel?: LogLevel;
+    cacheTtl?: number;
+}
 
 export class CodaClient {
     private readonly apiToken: string;
@@ -28,8 +42,16 @@ export class CodaClient {
     private readonly timeout: number;
     private readonly retries: number;
 
-    constructor(configParam?: CodaClientConfig) {
+    private readonly rateLimiter?: RateLimiter;
+    private readonly cache?: ApiCache;
+    private readonly metrics?: MetricsCollector;
+    private readonly logger?: Logger;
+
+    constructor(configParam?: EnhancedCodaClientConfig) {
         const cfg = configParam || {};
+
+        // Configuration du logger
+        this.logger = new Logger(cfg.logLevel || LogLevel.ERROR);
 
         // Récupération du token depuis .env ou config
         this.apiToken = cfg.apiToken || process.env.CODA_API_TOKEN || process.env.CODA_TOKEN || '';
@@ -41,13 +63,49 @@ export class CodaClient {
             );
         }
 
+        // Validation du format du token
+        if (!this.isValidTokenFormat(this.apiToken)) {
+            this.logger.error('Format de token invalide détecté');
+            throw new CodaApiError(
+                'Format de token invalide. Vérifiez votre token API Coda.',
+                401
+            );
+        }
+
         this.baseUrl = cfg.baseUrl || 'https://coda.io/apis/v1';
-        this.timeout = cfg.timeout || 30000; // 30 secondes
+        this.timeout = cfg.timeout || 30000; // 30 seconds
         this.retries = cfg.retries || 3;
+
+        if (cfg.enableRateLimit !== false) {
+            this.rateLimiter = new RateLimiter();
+            this.logger.debug('Rate limiter activated');
+        }
+
+        if (cfg.enableCache !== false) {
+            this.cache = new ApiCache(cfg.cacheTtl);
+            this.logger.debug('Cache activated');
+        }
+
+        if (cfg.enableMetrics !== false) {
+            this.metrics = new MetricsCollector();
+            this.logger.debug('Metrics activated');
+        }
+
+        this.logger.info('CodaClient init with success');
     }
 
     /**
-     * Effectue une requête HTTP vers l'API Coda
+     * Check if the token format is valid
+     * @param token The token to check
+     * @returns True if the token format is valid, false otherwise
+     */
+    private isValidTokenFormat(token: string): boolean {
+        // Les tokens Coda ont généralement un format spécifique
+        return token.length > 20 && /^[a-zA-Z0-9_-]+$/.test(token);
+    }
+
+    /**
+     * Http request wrapper with monitoring
      */
     private async request<T>(
         endpoint: string,
@@ -109,9 +167,15 @@ export class CodaClient {
     }
 
     /**
-     * Gère la réponse HTTP et les erreurs
+     * HTTP response handler and error handling
      */
     private async handleResponse<T>(response: Response): Promise<T> {
+
+        if (response.status === 429) {
+            const retryAfter = parseInt(response.headers.get('retry-after') || '60');
+            throw new CodaRateLimitError(retryAfter);
+        }
+
         const contentType = response.headers.get('content-type');
         const isJson = contentType?.includes('application/json');
 
@@ -122,7 +186,7 @@ export class CodaClient {
                 try {
                     errorData = await response.json();
                 } catch {
-                    // Ignore les erreurs de parsing JSON
+                    console.error('Error parsing JSON response');
                 }
             }
 
@@ -147,17 +211,17 @@ export class CodaClient {
         return new Promise(resolve => setTimeout(resolve, ms));
     }
 
-    // === MÉTHODES PUBLIQUES ===
+    //-------------------PUBLIC-METHODS----------------------------------------------------------------------------
 
     /**
-     * Récupère les informations de l'utilisateur actuel
+     * Get the current user's information
      */
     async whoAmI(): Promise<CodaUser> {
         return this.request<CodaUser>('/whoami');
     }
 
     /**
-     * Liste tous les documents
+     * list all documents
      */
     async listDocs(params?: CodaDocListParams): Promise<CodaResponse<CodaDoc>> {
         return this.request<CodaResponse<CodaDoc>>('/docs', { params });
@@ -171,7 +235,7 @@ export class CodaClient {
     }
 
     /**
-     * Crée un nouveau document
+     * Create new document
      */
     async createDoc(name: string, options?: {
         sourceDoc?: string;
@@ -187,56 +251,56 @@ export class CodaClient {
     }
 
     /**
-     * Supprime un document
+     * delete document
      */
     async deleteDoc(docId: string): Promise<CodaMutationResponse> {
         return this.request<CodaMutationResponse>(`/docs/${docId}`, { method: 'DELETE' });
     }
 
     /**
-     * Liste les tables d'un document
+     * List all tables in a document
      */
     async listTables(docId: string, params?: CodaTableListParams): Promise<CodaResponse<CodaTable>> {
         return this.request<CodaResponse<CodaTable>>(`/docs/${docId}/tables`, { params });
     }
 
     /**
-     * Récupère une table par son ID
+     * take a table by its ID
      */
     async getTable(docId: string, tableId: string): Promise<CodaTable> {
         return this.request<CodaTable>(`/docs/${docId}/tables/${tableId}`);
     }
 
     /**
-     * Liste les colonnes d'une table
+     * List all columns in a table
      */
     async listColumns(docId: string, tableId: string, params?: CodaListParams): Promise<CodaResponse<CodaColumn>> {
         return this.request<CodaResponse<CodaColumn>>(`/docs/${docId}/tables/${tableId}/columns`, { params });
     }
 
     /**
-     * Récupère une colonne par son ID
+     * take a column by its ID
      */
     async getColumn(docId: string, tableId: string, columnId: string): Promise<CodaColumn> {
         return this.request<CodaColumn>(`/docs/${docId}/tables/${tableId}/columns/${columnId}`);
     }
 
     /**
-     * Liste les lignes d'une table
+     * List all rows in a table
      */
     async listRows(docId: string, tableId: string, params?: CodaRowListParams): Promise<CodaResponse<CodaRow>> {
         return this.request<CodaResponse<CodaRow>>(`/docs/${docId}/tables/${tableId}/rows`, { params });
     }
 
     /**
-     * Récupère une ligne par son ID
+     * take a row by its ID
      */
     async getRow(docId: string, tableId: string, rowId: string, params?: { useColumnNames?: boolean; valueFormat?: string }): Promise<CodaRow> {
         return this.request<CodaRow>(`/docs/${docId}/tables/${tableId}/rows/${rowId}`, { params });
     }
 
     /**
-     * Insère de nouvelles lignes dans une table
+     * Insert new rows into a table
      */
     async insertRows(docId: string, tableId: string, rows: CodaRowRequest[], options?: {
         keyColumns?: string[];
@@ -253,7 +317,7 @@ export class CodaClient {
     }
 
     /**
-     * Met à jour une ligne existante
+     * Update an existing row
      */
     async updateRow(docId: string, tableId: string, rowId: string, row: CodaRowRequest, options?: {
         disableParsing?: boolean;
@@ -269,7 +333,7 @@ export class CodaClient {
     }
 
     /**
-     * Supprime une ligne
+     * Delete a row
      */
     async deleteRow(docId: string, tableId: string, rowId: string): Promise<CodaMutationResponse> {
         return this.request<CodaMutationResponse>(`/docs/${docId}/tables/${tableId}/rows/${rowId}`, {
@@ -278,7 +342,7 @@ export class CodaClient {
     }
 
     /**
-     * Supprime plusieurs lignes
+     * Delete multiple rows
      */
     async deleteRows(docId: string, tableId: string, rowIds: string[]): Promise<CodaMutationResponse> {
         const body = { rowIds };
@@ -289,14 +353,14 @@ export class CodaClient {
     }
 
     /**
-     * Vérifie le statut d'une mutation
+     * Status of a mutation
      */
     async getMutationStatus(requestId: string): Promise<CodaMutationStatus> {
         return this.request<CodaMutationStatus>(`/mutationStatus/${requestId}`);
     }
 
     /**
-     * Attend qu'une mutation soit terminée
+     * Wait for a mutation to complete
      */
     async waitForMutation(requestId: string, options?: {
         maxWaitTime?: number;
@@ -317,5 +381,9 @@ export class CodaClient {
         }
 
         throw new CodaApiError('Timeout en attendant la completion de la mutation', 408);
+    }
+
+    async getStats(): Promise<RequestMetrics|{}> {
+        return this.metrics?.getStats() || {};
     }
 }

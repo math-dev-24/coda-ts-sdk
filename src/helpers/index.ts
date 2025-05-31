@@ -1,5 +1,5 @@
 import { CodaClient } from '../client/codaClient';
-import {CodaResponse, CodaRow, CodaRowRequest, CodaCell, CodaRowListParams} from '../types';
+import {CodaResponse, CodaRow, CodaRowRequest, CodaCell, CodaRowListParams} from '../types/coda.type';
 
 /**
  * Helper pour paginer automatiquement à travers tous les résultats
