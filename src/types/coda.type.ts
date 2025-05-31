@@ -13,6 +13,7 @@ export interface CodaResponse<T> {
     nextPageLink?: string;
 }
 
+export type Method = 'GET' | 'POST' | 'PUT' | 'DELETE';
 
 export interface CodaUser {
     name: string;

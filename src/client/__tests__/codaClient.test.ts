@@ -13,7 +13,7 @@ describe('CodaClient', () => {
     beforeEach(() => {
         jest.clearAllMocks();
         // Reset environment variables
-        process.env.CODA_API_TOKEN = 'fc90b0b2-e4ab-47d4-b67e-0dbe23h234';
+        process.env.CODA_API_TOKEN = 'test_fc90b0b2-e44te-47d4-b67e-0dbe23h234';
     });
 
     describe('Constructor', () => {

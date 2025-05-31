@@ -1,4 +1,4 @@
-import { CodaClient } from '../client/codaClient';
+import { CodaClient } from '../client';
 import {HealthReport, PerformanceAlert, RequestMetrics} from "../types";
 
 /**

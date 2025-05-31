@@ -1,29 +1,23 @@
 export * from './types';
 export * from './helpers';
+
 // Client
 export { CodaClient } from './client/codaClient';
 export type { EnhancedCodaClientConfig } from './client/codaClient';
 // Logger
 export { Logger, LogLevel } from './utils/logger';
 
-
-// Utilitaires et factory
-export { CodaClientFactory } from './utils/clientFactory';
-export type { ConfigProfile } from './utils/clientFactory';
+// Utils et factory
+export { CodaClientFactory, ConfigProfile } from './utils';
+export type {  } from './utils';
 
 // Monitoring et diagnostics
-export { MonitoringUtils } from './utils/monitoring';
-export type { PerformanceAlert, HealthReport } from './types/monitoring.type';
-
-
-export { RateLimiter } from './client/rateLimiter';
-export { ApiCache } from './client/cache';
-export { MetricsCollector } from './client/metrics';
-export type { RequestMetrics } from './types/metrics.type';
+export { MonitoringUtils } from './utils';
+export { RateLimiter, ApiCache, MetricsCollector } from './client';
 
 // Profils de configuration
 export { CONFIG_PROFILES } from './config/profiles';
 
-// Export par défaut
-import { CodaClient } from './client/codaClient';
+// Export by default
+import { CodaClient } from './client';
 export default CodaClient;

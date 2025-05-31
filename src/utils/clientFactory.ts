@@ -1,4 +1,4 @@
-import { CodaClient, EnhancedCodaClientConfig } from '../client/codaClient';
+import { CodaClient, EnhancedCodaClientConfig } from '../client';
 import { CONFIG_PROFILES } from '../config/profiles';
 
 export type ConfigProfile = keyof typeof CONFIG_PROFILES;

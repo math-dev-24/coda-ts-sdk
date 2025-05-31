@@ -1,4 +1,4 @@
-import {RequestMetrics} from "../types/metrics.type";
+import {RequestMetrics} from "../types";
 
 export class MetricsCollector {
     private metrics: RequestMetrics = {

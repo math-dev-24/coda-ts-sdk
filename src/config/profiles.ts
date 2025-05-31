@@ -1,5 +1,5 @@
-import { LogLevel } from '../utils/logger';
-import {EnhancedCodaClientConfig} from "../client/codaClient";
+import { LogLevel } from '../utils';
+import {EnhancedCodaClientConfig} from "../client";
 
 /**
  * Profils for pre-defined configurations
@@ -11,12 +11,12 @@ export const CONFIG_PROFILES = {
         enableCache: true,
         enableRateLimit: true,
         enableMetrics: true,
-        cacheTtl: 60000, // 1 minute de cache
+        cacheTtl: 60000, // 1 minute of cache
         retries: 2,
         timeout: 10000
     } as EnhancedCodaClientConfig,
 
-    // Configuration pour la production
+    // Config for production
     production: {
         logLevel: LogLevel.ERROR,
         enableCache: true,
@@ -43,7 +43,7 @@ export const CONFIG_PROFILES = {
         enableCache: true,
         enableRateLimit: true,
         enableMetrics: true,
-        cacheTtl: 600000, // 10 minutes de cache
+        cacheTtl: 600000, // 10 minutes of cache
         retries: 5,
         timeout: 60000
     } as EnhancedCodaClientConfig,
@@ -54,7 +54,7 @@ export const CONFIG_PROFILES = {
         enableCache: true,
         enableRateLimit: false,
         enableMetrics: true,
-        cacheTtl: 30000, // 30 secondes
+        cacheTtl: 30000, // 30 secondes of cache
         retries: 1,
         timeout: 15000
     } as EnhancedCodaClientConfig

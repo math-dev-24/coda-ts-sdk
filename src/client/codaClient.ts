@@ -10,7 +10,6 @@ import {
     CodaRow,
     CodaMutationStatus,
     CodaMutationResponse,
-    CodaError,
     CodaApiError,
     CodaDocListParams,
     CodaTableListParams,
@@ -18,7 +17,8 @@ import {
     CodaRowRequest,
     CodaListParams,
     CodaRateLimitError,
-    RequestMetrics
+    RequestMetrics,
+    Method
 } from '../types';
 import {Logger, LogLevel} from "../utils";
 import {RateLimiter} from "./rateLimiter";
@@ -50,24 +50,24 @@ export class CodaClient {
     constructor(configParam?: EnhancedCodaClientConfig) {
         const cfg = configParam || {};
 
-        // Configuration du logger
+        // Config logger
         this.logger = new Logger(cfg.logLevel || LogLevel.ERROR);
 
-        // Récupération du token depuis .env ou config
+        // Take API token from .env or config
         this.apiToken = cfg.apiToken || process.env.CODA_API_TOKEN || process.env.CODA_TOKEN || '';
 
         if (!this.apiToken) {
             throw new CodaApiError(
-                'Token API Coda requis. Définissez CODA_API_TOKEN dans votre .env ou passez-le en paramètre.',
+                'Token API Coda is required. Set CODA_API_TOKEN in your .env or pass it as a parameter.',
                 401
             );
         }
 
-        // Validation du format du token
+        // Check token format
         if (!this.isValidTokenFormat(this.apiToken)) {
-            this.logger.error('Format de token invalide détecté');
+            this.logger.error('Token format invalid detected');
             throw new CodaApiError(
-                'Format de token invalide. Vérifiez votre token API Coda.',
+                'Token format invalid. Check your API token.',
                 401
             );
         }
@@ -109,7 +109,7 @@ export class CodaClient {
     private async request<T>(
         endpoint: string,
         options: {
-            method?: 'GET' | 'POST' | 'PUT' | 'DELETE';
+            method?: Method;
             body?: any;
             params?: Record<string, any>;
         } = {}
@@ -117,7 +117,7 @@ export class CodaClient {
         const { method = 'GET', body, params } = options;
         const url = new URL(`${this.baseUrl}${endpoint}`);
 
-        // Ajout des paramètres de requête
+        // Add query parameters
         if (params) {
             Object.entries(params).forEach(([key, value]) => {
                 if (value !== undefined && value !== null) {
@@ -142,7 +142,7 @@ export class CodaClient {
 
         let lastError: Error;
 
-        // Logique de retry
+        // Logic of retry
         for (let attempt = 0; attempt <= this.retries; attempt++) {
             try {
                 const response = await fetch(url.toString(), requestOptions);
@@ -150,12 +150,12 @@ export class CodaClient {
             } catch (error) {
                 lastError = error as Error;
 
-                // Ne pas retry sur les erreurs d'authentification ou de validation
+                // Don't retry on authentication or validation errors
                 if (error instanceof CodaApiError && [401, 403, 400, 422].includes(error.statusCode)) {
                     throw error;
                 }
 
-                // Attendre avant le prochain essai (backoff exponentiel)
+                // Wait before the next attempt (exponential backoff)
                 if (attempt < this.retries) {
                     await this.sleep(Math.pow(2, attempt) * 1000);
                 }
@@ -204,7 +204,7 @@ export class CodaClient {
     }
 
     /**
-     * Utilitaire pour attendre
+     * Utility for waiting
      */
     private sleep(ms: number): Promise<void> {
         return new Promise(resolve => setTimeout(resolve, ms));
@@ -214,6 +214,7 @@ export class CodaClient {
 
     /**
      * Get the current user's information
+     * @returns The current user's information
      */
     async whoAmI(): Promise<CodaUser> {
         return this.request<CodaUser>('/whoami');
@@ -221,13 +222,31 @@ export class CodaClient {
 
     /**
      * list all documents
+     * @param params Optional query parameters
+     * @returns A list of documents
      */
     async listDocs(params?: CodaDocListParams): Promise<CodaResponse<CodaDoc>> {
         return this.request<CodaResponse<CodaDoc>>('/docs', { params });
     }
 
     /**
-     * Récupère un document par son ID
+     * Get document ID by URL
+     * @param docUrl The document URL
+     * @returns The document ID
+     */
+    getDocIdByUrl(docUrl: string): string {
+        const regex = /\/d\/[^_]+_([^/]+)/;
+        const match = docUrl.match(regex);
+        if (match && match[1]) {
+            return match[1];
+        }
+        return '';
+    }
+
+    /**
+     * Take a document by its ID
+     * @param docId The document ID
+     * @returns The document
      */
     async getDoc(docId: string): Promise<CodaDoc> {
         return this.request<CodaDoc>(`/docs/${docId}`);
@@ -235,6 +254,9 @@ export class CodaClient {
 
     /**
      * Create new document
+     * @param name The document name
+     * @param options Optional parameters
+     * @returns The created document
      */
     async createDoc(name: string, options?: {
         sourceDoc?: string;
@@ -333,6 +355,10 @@ export class CodaClient {
 
     /**
      * Delete a row
+     * @param docId The document ID
+     * @param tableId The table ID
+     * @param rowId The row ID
+     * @returns The mutation response
      */
     async deleteRow(docId: string, tableId: string, rowId: string): Promise<CodaMutationResponse> {
         return this.request<CodaMutationResponse>(`/docs/${docId}/tables/${tableId}/rows/${rowId}`, {
