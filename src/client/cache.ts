@@ -52,7 +52,7 @@ export class ApiCache {
         };
     }
 
-    // Nettoyage automatique des entrées expirées
+    // Cleanup expired entries automatically
     cleanup(): void {
         const now = Date.now();
         for (const [key, entry] of this.cache.entries()) {

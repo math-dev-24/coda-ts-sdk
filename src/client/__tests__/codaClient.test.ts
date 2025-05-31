@@ -1,16 +1,19 @@
 import { CodaClient } from '../codaClient';
 import { CodaApiError, CodaRateLimitError } from '../../types';
-import { LogLevel } from '../../utils/logger';
-import fetch from 'node-fetch';
+import { LogLevel } from '../../utils';
 
-// Mock fetch
+import fetch from 'node-fetch';
+import { jest } from '@jest/globals';
+
+jest.mock('node-fetch');
+
 const mockFetch = fetch as jest.MockedFunction<typeof fetch>;
 
 describe('CodaClient', () => {
     beforeEach(() => {
         jest.clearAllMocks();
         // Reset environment variables
-        process.env.CODA_API_TOKEN = 'test_token_1234567890abcdef';
+        process.env.CODA_API_TOKEN = 'fc90b0b2-e4ab-47d4-b67e-0dbe23h234';
     });
 
     describe('Constructor', () => {

@@ -1,6 +1,6 @@
 import { config } from 'dotenv';
 
-config({ path: '.env.test.example' });
+config({ path: '.env.test' });
 
 jest.mock('node-fetch');
 

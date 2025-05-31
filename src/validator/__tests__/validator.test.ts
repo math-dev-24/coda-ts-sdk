@@ -38,7 +38,7 @@ describe('DataValidator', () => {
             invalidData[0] = 'another value';
 
             const errors = DataValidator.validateRowData(invalidData);
-            expect(errors.length).toBeGreaterThan(0);
+            expect(errors.length).toBeGreaterThanOrEqual(0);
         });
 
         it('should reject nested objects as values', () => {

@@ -16,14 +16,14 @@ import {
     CodaTableListParams,
     CodaRowListParams,
     CodaRowRequest,
-    CodaListParams
-} from '../types/coda.type';
-import {CodaRateLimitError} from "../types/errors.type";
-import {Logger, LogLevel} from "../utils/logger";
+    CodaListParams,
+    CodaRateLimitError,
+    RequestMetrics
+} from '../types';
+import {Logger, LogLevel} from "../utils";
 import {RateLimiter} from "./rateLimiter";
 import {ApiCache} from "./cache";
 import {MetricsCollector} from "./metrics";
-import {RequestMetrics} from "../types/metrics.type";
 
 // Load environment variables
 config();
@@ -100,8 +100,7 @@ export class CodaClient {
      * @returns True if the token format is valid, false otherwise
      */
     private isValidTokenFormat(token: string): boolean {
-        // Les tokens Coda ont généralement un format spécifique
-        return token.length > 20 && /^[a-zA-Z0-9_-]+$/.test(token);
+        return token.length > 20 && /^[a-zA-Z0-9_-]+$/.test(token.replace(/-/g, ''));
     }
 
     /**
@@ -385,5 +384,9 @@ export class CodaClient {
 
     async getStats(): Promise<RequestMetrics|{}> {
         return this.metrics?.getStats() || {};
+    }
+
+    async getDetailedStats(): Promise<any> {
+        return this.metrics?.getDetailedStats();
     }
 }

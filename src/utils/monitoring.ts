@@ -1,5 +1,5 @@
 import { CodaClient } from '../client/codaClient';
-import {HealthReport, PerformanceAlert} from "../types/monitoring.type";
+import {HealthReport, PerformanceAlert, RequestMetrics} from "../types";
 
 /**
  * utils for monitoring and diagnostics
@@ -20,25 +20,23 @@ export class MonitoringUtils {
             ...options
         };
 
-        return setInterval(() => {
-            const stats = client.getStats();
+        return setInterval(async () => {
+            const metrics = await client.getStats() as RequestMetrics;
             const alerts: PerformanceAlert[] = [];
 
-            if (stats.metrics) {
+            if (metrics && metrics.totalRequests > 0) {
                 // Check response time
-                if (stats.metrics.avgResponseTime > opts.maxResponseTime) {
+                if (metrics.avgResponseTime > opts.maxResponseTime) {
                     alerts.push({
                         type: 'HIGH_RESPONSE_TIME',
-                        message: `Temps de réponse élevé: ${stats.metrics.avgResponseTime.toFixed(0)}ms`,
-                        value: stats.metrics.avgResponseTime,
+                        message: `Temps de réponse élevé: ${metrics.avgResponseTime.toFixed(0)}ms`,
+                        value: metrics.avgResponseTime,
                         threshold: opts.maxResponseTime
                     });
                 }
 
                 // Check success rate
-                const successRate = stats.metrics.totalRequests > 0
-                    ? stats.metrics.successfulRequests / stats.metrics.totalRequests
-                    : 1;
+                const successRate = metrics.successfulRequests / metrics.totalRequests;
 
                 if (successRate < opts.minSuccessRate) {
                     alerts.push({
@@ -50,11 +48,11 @@ export class MonitoringUtils {
                 }
 
                 // Check rate limits
-                if (stats.metrics.rateLimitHits > 0) {
+                if (metrics.rateLimitHits > 0) {
                     alerts.push({
                         type: 'RATE_LIMIT_HIT',
-                        message: `Rate limits atteints: ${stats.metrics.rateLimitHits} fois`,
-                        value: stats.metrics.rateLimitHits,
+                        message: `Rate limits atteints: ${metrics.rateLimitHits} fois`,
+                        value: metrics.rateLimitHits,
                         threshold: 0
                     });
                 }
@@ -69,27 +67,27 @@ export class MonitoringUtils {
     /**
      * Generate a health report for the client
      */
-    static generateHealthReport(client: CodaClient): HealthReport {
-        const stats = client.getStats();
+    static async generateHealthReport(client: CodaClient): Promise<HealthReport> {
+        const detailedStats = await client.getDetailedStats();
         const now = Date.now();
 
         return {
             timestamp: now,
-            status: this.calculateOverallHealth(stats),
-            metrics: stats.metrics || {},
-            cache: stats.cache || {},
-            rateLimiter: stats.rateLimiter || {},
-            recommendations: this.generateRecommendations(stats)
+            status: this.calculateOverallHealth(detailedStats.metrics),
+            metrics: detailedStats.metrics || {},
+            cache: detailedStats.cache || {},
+            rateLimiter: detailedStats.rateLimiter || {},
+            recommendations: this.generateRecommendations(detailedStats)
         };
     }
 
-    private static calculateOverallHealth(stats: any): 'HEALTHY' | 'DEGRADED' | 'UNHEALTHY' {
-        if (!stats.metrics || stats.metrics.totalRequests === 0) {
+    private static calculateOverallHealth(metrics?: RequestMetrics): 'HEALTHY' | 'DEGRADED' | 'UNHEALTHY' {
+        if (!metrics || metrics.totalRequests === 0) {
             return 'HEALTHY';
         }
 
-        const successRate = stats.metrics.successfulRequests / stats.metrics.totalRequests;
-        const avgResponseTime = stats.metrics.avgResponseTime;
+        const successRate = metrics.successfulRequests / metrics.totalRequests;
+        const avgResponseTime = metrics.avgResponseTime;
 
         if (successRate >= 0.98 && avgResponseTime < 2000) {
             return 'HEALTHY';
@@ -100,10 +98,14 @@ export class MonitoringUtils {
         }
     }
 
-    private static generateRecommendations(stats: any): string[] {
+    private static generateRecommendations(stats: {
+        metrics?: RequestMetrics;
+        cache?: any;
+        rateLimiter?: any;
+    }): string[] {
         const recommendations: string[] = [];
 
-        if (stats.metrics) {
+        if (stats.metrics && stats.metrics.totalRequests > 0) {
             if (stats.metrics.avgResponseTime > 3000) {
                 recommendations.push('Considérez augmenter le cache TTL pour réduire les appels API');
             }
